@@ -1,6 +1,6 @@
 local config = require 'config.client'
 local defaultSpawn = require 'config.shared'.defaultSpawn
-
+local QBCore = exports['qb-core']:GetCoreObject()
 local previewCam = nil
 local randomLocation = config.characters.locations[math.random(1, #config.characters.locations)]
 
@@ -189,6 +189,7 @@ local function spawnDefault() -- We use a callback to make the server wait on th
 end
 
 local function spawnLastLocation()
+    local player = QBCore.Functions.GetPlayerData()
     DoScreenFadeOut(500)
 
     while not IsScreenFadedOut() do
@@ -198,10 +199,10 @@ local function spawnLastLocation()
     destroyPreviewCam()
 
     pcall(function() exports.spawnmanager:spawnPlayer({
-        x = QBX.PlayerData.position.x,
-        y = QBX.PlayerData.position.y,
-        z = QBX.PlayerData.position.z,
-        heading = QBX.PlayerData.position.w
+        x = player.position.x,
+        y = player.position.y,
+        z = player.position.z,
+        heading = player.position.w
     }) end)
 
     TriggerServerEvent('QBCore:Server:OnPlayerLoaded')
@@ -297,10 +298,10 @@ RegisterNuiCallback('createCharacter', function(data, cb)
   cb(success)
 end)
 
-RegisterNetEvent('qbx_core:client:playerLoggedOut', function()
-  if GetInvokingResource() then return end -- Make sure this can only be triggered from the server
-  chooseCharacter()
-end)
+-- RegisterNetEvent('qbx_core:client:playerLoggedOut', function()
+--   if GetInvokingResource() then return end -- Make sure this can only be triggered from the server
+--   chooseCharacter()
+-- end)
 
 CreateThread(function()
   local model = `a_m_y_bevhills_01`

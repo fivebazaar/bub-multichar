@@ -1,27 +1,28 @@
 local config = require 'config.server'
+local QBCore = exports['qb-core']:GetCoreObject()
 
 local starterItems = { -- Character starting items
   { name = 'phone', amount = 1 },
-  { 
-    name = 'id_card', 
-    amount = 1, 
-    metadata = function(source)
-      if GetResourceState('qbx_idcard') ~= 'started' then
-        error('qbx_idcard resource not found. Required to give an id_card as a starting item')
-      end
-      return exports.qbx_idcard:GetMetaLicense(source, {'id_card'})
-    end
-  },
-  { 
-    name = 'driver_license', 
-    amount = 1, 
-    metadata = function(source)
-      if GetResourceState('qbx_idcard') ~= 'started' then
-        error('qbx_idcard resource not found. Required to give an id_card as a starting item')
-      end
-      return exports.qbx_idcard:GetMetaLicense(source, {'driver_license'})
-    end
-  },
+  -- { 
+  --   name = 'id_card', 
+  --   amount = 1, 
+  --   metadata = function(source)
+  --     if GetResourceState('qbx_idcard') ~= 'started' then
+  --       error('qbx_idcard resource not found. Required to give an id_card as a starting item')
+  --     end
+  --     return exports.qbx_idcard:GetMetaLicense(source, {'id_card'})
+  --   end
+  -- },
+  -- { 
+  --   name = 'driver_license', 
+  --   amount = 1, 
+  --   metadata = function(source)
+  --     if GetResourceState('qbx_idcard') ~= 'started' then
+  --       error('qbx_idcard resource not found. Required to give an id_card as a starting item')
+  --     end
+  --     return exports.qbx_idcard:GetMetaLicense(source, {'driver_license'})
+  --   end
+  -- },
 }
 
 local function fetchPlayerSkin(citizenId)
@@ -58,19 +59,37 @@ end
 
 ---@param source Source
 local function giveStarterItems(source)
-  	if GetResourceState('ox_inventory') == 'missing' then return end
-	while not exports.ox_inventory:GetInventory(source) do
-		Wait(100)
-	end
-	for i = 1, #starterItems do
-		local item = starterItems[i]
-		if item.metadata and type(item.metadata) == 'function' then
-			exports.ox_inventory:AddItem(source, item.name, item.amount, item.metadata(source))
-		else
-			exports.ox_inventory:AddItem(source, item.name, item.amount, item.metadata)
-		end
-	end
+  local useOxInventory = GetResourceState('ox_inventory') == 'started'
+  local useQbInventory = GetResourceState('qb-inventory') == 'started'
+  
+  if not useOxInventory and not useQbInventory then return end
+  
+  if useOxInventory then
+      while not exports.ox_inventory:GetInventory(source) do
+          Wait(100)
+      end
+  end
+  
+  for i = 1, #starterItems do
+      local item = starterItems[i]
+      if useOxInventory then
+          -- Add item using ox_inventory
+          if item.metadata and type(item.metadata) == 'function' then
+              exports.ox_inventory:AddItem(source, item.name, item.amount, item.metadata(source))
+          else
+              exports.ox_inventory:AddItem(source, item.name, item.amount, item.metadata)
+          end
+      elseif useQbInventory then
+          -- Add item using qb-inventory
+          if item.metadata and type(item.metadata) == 'function' then
+              exports['qb-inventory']:AddItem(source, item.name, item.amount, item.metadata(source))
+          else
+              exports['qb-inventory']:AddItem(source, item.name, item.amount, item.metadata)
+          end
+      end
+  end
 end
+
 
 local function getAllowedAmountOfCharacters(license2, license)
     return config.playersNumberOfCharacters[license2] or license and config.playersNumberOfCharacters[license] or config.defaultNumberOfCharacters
@@ -80,18 +99,11 @@ lib.callback.register('bub-multichar:server:getCharacters', function(source)
   local license2, license = GetPlayerIdentifierByType(source, 'license2'), GetPlayerIdentifierByType(source, 'license')
   local chars = fetchAllPlayerEntities(license2, license)
   local allowedAmount = getAllowedAmountOfCharacters(license2, license)
-  
   local sortedChars = {}
-  
-  for i = 1, allowedAmount do
-    sortedChars[i] = nil
-  end
-
   for i = 1, #chars do
     local char = chars[i]
-    sortedChars[i] = char
+    sortedChars[char.cid] = char
   end
-
   return sortedChars, allowedAmount
 end)
 
@@ -103,10 +115,12 @@ lib.callback.register('bub-multichar:server:getPreviewPedData', function(_, citi
 end)
 
 lib.callback.register('bub-multichar:server:loadCharacter', function(source, citizenId)
-  local success = exports.qbx_core:Login(source, citizenId)
+  -- local success = exports.qbx_core:Login(source, citizenId)
+  local success = QBCore.Player.Login(source, citizenId)
   if not success then return end
 
-  exports.qbx_core:SetPlayerBucket(source, 0)
+  -- exports.qbx_core:SetPlayerBucket(source, 0)
+  QBCore.Functions.SetPlayerBucket(source, 0)
   lib.print.info(('%s (Citizen ID: %s) has successfully loaded!'):format(GetPlayerName(source), citizenId))
 end)
 
@@ -116,23 +130,28 @@ lib.callback.register('bub-multichar:server:createCharacter', function(source, d
   local newData = {}
   newData.charinfo = data
 
-  local success = exports.qbx_core:Login(source, nil, newData)
+  -- local success = exports.qbx_core:Login(source, nil, newData)
+  local success = QBCore.Player.Login(source, nil, newData)
   if not success then return end
 
   giveStarterItems(source)
-  exports.qbx_core:SetPlayerBucket(source, 0)
+  -- exports.qbx_core:SetPlayerBucket(source, 0)
+  QBCore.Functions.SetPlayerBucket(source, 0)
 
   lib.print.info(('%s has created a character'):format(GetPlayerName(source)))
   return newData
 end)
 
 lib.callback.register('bub-multichar:server:setCharBucket', function(source)
-  exports.qbx_core:SetPlayerBucket(source, source)
+  -- exports.qbx_core:SetPlayerBucket(source, source)
+  QBCore.Functions.SetPlayerBucket(source, source)
   assert(GetPlayerRoutingBucket(source) == source, 'Multicharacter bucket not set.')
 end)
 
 RegisterNetEvent('bub-multichar:server:deleteCharacter', function(citizenId)
   local src = source
-  exports.qbx_core:DeleteCharacter(citizenId)
-  exports.qbx_core:Notify(src, 'Successfully deleted your character', 'success')
+  -- exports.qbx_core:DeleteCharacter(citizenId)
+  TriggerEvent('qb-multicharacter:server:deleteCharacter', citizenId)
+  -- exports.qbx_core:Notify(src, 'Successfully deleted your character', 'success')
+  TriggerClientEvent('QBCore:Notify', src, 'Successfully deleted your character', 'success')
 end)
